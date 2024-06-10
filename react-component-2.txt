@@ -1,0 +1,46 @@
+import React, { memo } from 'react';
+import { Container } from '@instruments/common/Container';
+import { Gauge } from '../../../Components/Gauge';
+
+interface CabinAltitudeProps {
+    x: number;
+    y: number;
+    cabinAlt: number;
+    cabAltTarget: number;
+    auto: boolean;
+}
+/* TODO: Pulsing Needle & Number */
+export const CabinAltitude: React.FC<CabinAltitudeProps> = memo(({ x, y, cabinAlt, cabinAltTarget, auto }) => {
+    const getCabAltRotation = (cabinAltitude: number) => {
+        if (cabinAltitude <= 10000) return -0.018 * cabinAltitude + 225;
+        return -0.006 * cabinAltitude + 105;
+    };
+
+    return (
+        <Container x={x} y={y}>
+            <text x={0} y={0} fontSize={27} fill="lime" textAnchor="middle">
+                {auto ? 'AUTO' : 'MAN'}
+            </text>
+            <text x={48} y={0} fontSize={27} fill="white">
+                CAB ALT
+            </text>
+            <text x={74} y={32} fontSize={20} fill="cyan" textAnchor="middle">
+                FT
+            </text>
+
+            <Gauge x={72} y={127} r={78} limits={[{ start: 52, end: 15, color: 'red' }]} startAngle={236} endAngle={15}>
+                <Gauge.Marks length={10} angles={[225, 180, 135, 90, 45, 15]} />
+                <Gauge.ValueMarks fontSize={20} minDist={16} values={[{ value: '0', angle: 229 }, { value: '5', angle: 136, dist: 12 }, { value: '10', angle: 37, dist: 6 }, { value: '15', angle: 2, dist: 10 }]} />
+                <Gauge.Needle value={getCabAltRotation(cabinAlt)} />
+                <Gauge.Circle stroke={auto ? 'violet' : 'cyan'} distance={0} value={getCabAltRotation(cabinAltTarget)} />
+            </Gauge>
+
+            <text x={169} y={187} fontSize={33} fill={cabinAlt >= 9590 ? 'red' : 'lime'} textAnchor="end">
+                {cabinAlt}
+            </text>
+            <text x={168} y={211} fontSize={25} fill={auto ? 'none' : 'cyan'} textAnchor="end">
+                {cabinAltTarget}
+            </text>
+        </Container>
+    );
+});

@@ -1,4 +1,5 @@
-react = open("react-component.txt", "r")
+filename = input("Enter filename (without extension): ")
+react = open(filename + ".txt", "r")
 
 is_sd_index = input("Is this an SD index file? (y/n) ") == "y"
 
@@ -9,7 +10,7 @@ simvar_names = []
 
 
 def write_file():
-    with open("Component.tsx", "w") as result:
+    with open(filename + ".tsx", "w") as result:
         for line in new_file_lines:
             if line.endswith("\n"):
                 result.write(line)
@@ -298,14 +299,14 @@ def process_jsx(parsed_jsx, edit_fn):
 
         # Handle ternaries as text children
         if element == "text":
-            edited_children = [
-                (
-                    f"{{{convert_ternary_to_map(child[1:-1])}}}"
-                    if "?" in child or ":" in child
-                    else child
-                )
-                for child in edited_children
-            ]
+            edited_children = []
+            for child in children:
+                if "{" in child and "}" in child:
+                    child = child[1:-1]
+                    if "?" in child and ":" in child:
+                        child = convert_ternary_to_map(child)
+                    child = f"{{{get_prefix(child)}{child}}}"
+                edited_children.append(child)
 
         if edited_children:
             children_str = "\n".join(
@@ -577,7 +578,6 @@ for line in react.readlines():
 
     if reached_return:
         if paranthesis_in < paranthesis_at_return_start:
-            print("Reached end of return")
             new_file_lines.extend(process_jsx(parse_jsx(return_body), edit_prop))
 
             reached_return = False
@@ -590,7 +590,6 @@ for line in react.readlines():
 
     # Check if we've reached the end of the first component in the file, because this script can only handle one at a time
     if reached_declaration_line and paranthesis_in == 0 and brackets_in == 0:
-        print("Reached end of component")
         break
 
     # Handle the rest of the file

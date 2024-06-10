@@ -1,0 +1,17 @@
+const [apuAvail] = useSimVar('L:A350X_APU_AVAIL', 'boolean');
+
+const [apuBleedPressure] = useSimVar('L:A350X_APU_BLEED_PRESSURE', 'psi');
+const [apuBleedValveOpen] = useSimVar('L:A350X_APU_BLEED_VALVE_OPEN', 'bool');
+const [apuBleedValveFault] = useSimVar('L:A350X_APU_BLEED_VALVE_ABNORMAL', 'bool');
+
+const [apuFuelUsed] = useSimVar('L:A350X_APU_FUEL_USED', 'kg');
+
+const [apuNPct] = useSimVar('L:A350X_APU_N', 'pct');
+const [apuEgt] = useSimVar('L:A350X_APU_EGT', 'celsius');
+const [apuEgtLimit] = useSimVar('L:A350X_APU_EGT_LIMIT', 'celsius');
+
+const [apuFuelPressLow] = useSimVar('L:A350X_APU_FUEL_PRESS_LOW', 'bool');
+const [apuOilPressLow] = useSimVar('L:A350X_APU_OIL_PRESS_LOW', 'bool');
+
+const [apuFlapState] = useSimVar('L:A350X_APU_FLAP_STATE', 'enum');
+const [flapClosedTime] = useSimVar('L:A350X_APU_FLAP_CLOSED_TIME', 'number');

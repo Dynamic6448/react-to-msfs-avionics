@@ -15,7 +15,7 @@ export const BleedDisplay: React.FC<BleedDisplayProps> = memo(({ x, y, pressure,
         <Line path="m49,77 v-14" />
         <Line path="m49,27 v-14 arrow" visible={valveOpen} />
 
-        <Valve x={49} y={45} state={valveOpen || fault ? 2 : 0} fault={fault} />
+        <Valve x={49} y={45} state={valveOpen ? 2 : 0} fault={fault} />
 
         <rect x={0} y={78} width={98} height={66} fill="none" stroke="white" strokeWidth={2} strokeLinejoin="round" />
 
@@ -23,7 +23,7 @@ export const BleedDisplay: React.FC<BleedDisplayProps> = memo(({ x, y, pressure,
             BLEED
         </text>
         <text x={45} y={134} fontSize={26} fill="lime" textAnchor="end">
-            {pressure >= 50 ? 'AVAIL' : ''}
+            {pressure}
         </text>
         <text x={50} y={134} fontSize={20} fill="cyan">
             PSI

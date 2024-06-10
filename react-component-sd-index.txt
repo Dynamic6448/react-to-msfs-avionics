@@ -1,0 +1,80 @@
+import React, { memo, useEffect, useState } from 'react';
+import { useSimVar } from '@instruments/common/simVars';
+import { useUpdate } from '@instruments/common/hooks';
+import { APUGen } from '../../../Components/APUGen';
+import { InfoText } from './InfoText';
+import { BleedDisplay } from './BleedDisplay';
+import { FuelDisplay } from './FuelDisplay';
+import { N1Gauge } from './N1Gauge';
+import { EGTGauge } from './EGTGauge';
+
+export const Apu: React.FC = memo(() => {
+    const [apuAvail] = useSimVar('L:A350X_APU_AVAIL', 'boolean');
+
+    const [apuBleedPressure] = useSimVar('L:A350X_APU_BLEED_PRESSURE', 'psi');
+    const [apuBleedValveOpen] = useSimVar('L:A350X_APU_BLEED_VALVE_OPEN', 'bool');
+    const [apuBleedValveFault] = useSimVar('L:A350X_APU_BLEED_VALVE_ABNORMAL', 'bool');
+
+    const [apuFuelUsed] = useSimVar('L:A350X_APU_FUEL_USED', 'kg');
+
+    const [apuNPct] = useSimVar('L:A350X_APU_N', 'pct');
+    const [apuEgt] = useSimVar('L:A350X_APU_EGT', 'celsius');
+    const [apuEgtLimit] = useState(1280); // useSimVar('L:A350X_APU_EGT_LIMIT', 'celsius');
+
+    const [apuFuelPressLow] = useSimVar('L:A350X_APU_FUEL_PRESS_LOW', 'bool');
+    const [apuOilPressLow] = useSimVar('L:A350X_APU_OIL_PRESS_LOW', 'bool');
+
+    const [apuFlapState] = useSimVar('L:A350X_APU_FLAP_STATE', 'enum');
+    const [flapClosedTime] = useSimVar('L:A350X_APU_FLAP_CLOSED_TIME', 'number');
+
+    const [flapStateText, setFlapStateText] = useState('');
+    const [flapStateVisible, setFlapStateVisible] = useState(false);
+
+    useEffect(() => {
+        if (apuFlapState === 0) {
+            setFlapStateText('FLAP CLOSED');
+        } else if (apuFlapState === 1) {
+            setFlapStateText('FLAP MOVING');
+        } else if (apuFlapState === 2) {
+            setFlapStateText('FLAP OPEN');
+        } else {
+            setFlapStateText('INVALID FLAP STATE');
+        }
+    }, [apuFlapState]);
+
+    useEffect(() => {
+        if (flapClosedTime >= 10000) {
+            setFlapStateVisible(false);
+        } else {
+            setFlapStateVisible(true);
+        }
+    }, [flapClosedTime]);
+
+    return (
+        <>
+            <text x={301} y={281} fontSize={32} fill="lime">
+                {apuAvail ? 'AVAIL' : ''}
+            </text>
+
+            <APUGen x={165} y={278} />
+
+            <BleedDisplay x={508} y={271} pressure={apuBleedPressure} valveOpen={apuBleedValveOpen} fault={apuBleedValveFault} />
+            <FuelDisplay x={238} y={470} fuelUsed={apuFuelUsed} />
+
+            <path d="m32,463 v-26 h631 v26" fill="none" stroke="white" strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
+
+            <N1Gauge x={156} y={553} nPct={apuNPct} />
+            <EGTGauge x={155} y={716} egt={apuEgt} egtLimit={apuEgtLimit} />
+
+            <InfoText x={418} y={586} fill="lime" visible={apuFuelPressLow}>
+                FUEL PRESS LO
+            </InfoText>
+            <InfoText x={418} y={646} fill="lime" visible={flapStateVisible}>
+                {flapStateText}
+            </InfoText>
+            <InfoText x={418} y={706} fill="orange" visible={apuOilPressLow}>
+                OIL LEVEL LO
+            </InfoText>
+        </>
+    );
+});
