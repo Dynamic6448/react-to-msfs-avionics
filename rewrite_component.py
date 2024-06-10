@@ -305,7 +305,9 @@ def process_jsx(parsed_jsx, edit_fn):
                     child = child[1:-1]
                     if "?" in child and ":" in child:
                         child = convert_ternary_to_map(child)
-                    child = f"{{{get_prefix(child)}{child}}}"
+                        child = f"{{{child}}}"
+                    else:
+                        child = f"{{{get_prefix(child)}{child}}}"
                 edited_children.append(child)
 
         if edited_children:
