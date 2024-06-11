@@ -49,6 +49,20 @@ def handle_use_state_line(line):
     return f"{tab()}private {variable_name} = Subject.create({default_value});"
 
 
+def check_if_function_exists(fn_name: str):
+    for line in new_file_lines:
+        if f"private {fn_name}(" in line:
+            return True
+    return False
+
+
+def check_if_variable_exists(var_name: str):
+    for line in new_file_lines:
+        if f"private {var_name}: " in line or f"private {var_name} = " in line:
+            return True
+    return False
+
+
 def get_all_props():
     reached_interface = False
     left_interface = False
@@ -141,6 +155,19 @@ def replace_subject(
         new_file_lines[i] = updated_line
 
 
+# This function only works if the function body is a one-liner return statement
+def insert_new_mapped_subject(
+    variable_name: str, function_body: str, dependencies: list[str]
+):
+    new_mapped_subject = f"private {variable_name} = MappedSubject.create(({', '.join(dependencies)}) => ({function_body}), {', '.join([f'{get_prefix(dep)}{dep}' for dep in dependencies])})"
+
+    line_to_find = "private subscriptions" if is_sd_index else "render(): VNode"
+    for i, l in enumerate(new_file_lines):
+        if line_to_find in l:
+            new_file_lines.insert(i, new_mapped_subject)
+            break
+
+
 def get_prefix(prop_name):
     this_dot = (
         "this."
@@ -176,7 +203,9 @@ def convert_ternary_to_map(ternary: str):
         prefix = get_prefix(variable_name)
 
         # We only want to convert the ternary if it involves a subscribable
-        if check_if_prop_subscribable(variable_name):
+        if check_if_prop_subscribable(variable_name) or check_if_variable_exists(
+            variable_name
+        ):
             replacement = (
                 f"{prefix}{variable_name}.map(({variable_name}) => ({ternary}))"
             )
@@ -189,7 +218,7 @@ def convert_ternary_to_map(ternary: str):
         # We only want to convert the ternary if it involves a subscribable (this only checks if one of them is subscribable)
         variables_are_subscribables = False
         for v in variable_names:
-            if check_if_prop_subscribable(v):
+            if check_if_prop_subscribable(v) or check_if_variable_exists(v):
                 variables_are_subscribables = True
                 break
 
@@ -199,14 +228,7 @@ def convert_ternary_to_map(ternary: str):
             )
             variable_name = variable_name[0].lower() + variable_name[1:]
 
-            mapped_subject_line = f"private {variable_name} = MappedSubject.create(([{', '.join(variable_names)}]) => ({ternary}), {', '.join([f'{get_prefix(v)}{v}' for v in variable_names])})"
-
-            # Figure out where to put the mapped subject line
-            line_to_find = "private subscriptions" if is_sd_index else "render(): VNode"
-            for i, l in enumerate(new_file_lines):
-                if line_to_find in l:
-                    new_file_lines.insert(i, mapped_subject_line)
-                    break
+            insert_new_mapped_subject(variable_name, ternary, variable_names)
 
             replacement = f"this.{variable_name}"
 
@@ -235,8 +257,11 @@ def parse_jsx(jsx_lines: list[str]):
                 parsed_jsx.append(closed_element)
 
         elif stripped_line.startswith("<"):
-            tag_end = stripped_line.find(">")
+            # Find the index of the tag end
+            tag_end = stripped_line.rfind(">")
+            # Figure out if the tag is self-closing
             is_self_closing = stripped_line[tag_end - 1] == "/"
+            # Remove trailing/leading forward slash (for self-closing tags) and whitespace
             tag_content = stripped_line[1:tag_end].strip("/ ")
 
             tag_parts = []
@@ -254,9 +279,18 @@ def parse_jsx(jsx_lines: list[str]):
                     i += 1
                     continue
 
-                # Parse props properly
+                # Parse props as key-value pairs
                 key_value = item.split("=")
-                if len(key_value) == 2:
+
+                equal_sign_index = item.find("=")
+                # Make sure something precedes and follows the equal sign. If not, then it's a comparison probably in a ternary
+                is_not_a_comparison = (
+                    equal_sign_index != -1
+                    and equal_sign_index != 0
+                    and equal_sign_index != len(item) - 1
+                )
+
+                if len(key_value) == 2 and is_not_a_comparison:
                     tag_parts.append(item)
                     i += 1
                 else:
@@ -266,7 +300,7 @@ def parse_jsx(jsx_lines: list[str]):
             props = {}
             for part in tag_parts[1:]:
                 if "=" in part:
-                    prop_name, prop_value = part.split("=")
+                    prop_name, prop_value = part.split("=", 1)  # Split only once
                     props[prop_name] = prop_value
 
             if is_self_closing:
@@ -297,17 +331,21 @@ def process_jsx(parsed_jsx, edit_fn):
 
         props_str = " ".join([f"{key}={value}" for key, value in edited_props.items()])
 
-        # Handle ternaries as text children
-        if element == "text":
+        # Handle children that could potentially be dynamic (like including subscribables)
+        if (
+            len(children) > 0
+            and isinstance(children[0], str)
+            and children[0].strip().startswith("{")
+            and children[0].strip().endswith("}")
+        ):
             edited_children = []
             for child in children:
-                if "{" in child and "}" in child:
-                    child = child[1:-1]
-                    if "?" in child and ":" in child:
-                        child = convert_ternary_to_map(child)
-                        child = f"{{{child}}}"
-                    else:
-                        child = f"{{{get_prefix(child)}{child}}}"
+                child = child[1:-1]
+                if "?" in child and ":" in child:
+                    child = convert_ternary_to_map(child)
+                    child = f"{{{child}}}"
+                else:
+                    child = f"{{{get_prefix(child)}{child}}}"
                 edited_children.append(child)
 
         if edited_children:
@@ -339,11 +377,41 @@ def edit_prop(element, prop_name, prop_value):
 
     prop_value_trimmed = prop_value[1:-1]
 
-    prefix = get_prefix(prop_value_trimmed)
-
     # Identify if prop value is just a variable (it contains only letters)
     if prop_value_trimmed.isalpha():
-        prop_value_trimmed = f"{prefix}{prop_value_trimmed}"
+        prop_value_trimmed = f"{get_prefix(prop_value_trimmed)}{prop_value_trimmed}"
+
+    # Check if prop value is a function
+    if "(" in prop_value_trimmed and ")" in prop_value_trimmed:
+        function_name = prop_value_trimmed[: prop_value_trimmed.index("(")]
+        parameters = prop_value_trimmed[
+            prop_value_trimmed.index("(") + 1 : prop_value_trimmed.index(")")
+        ].split(", ")
+
+        # We need to check what parameters are subscribables
+        subscribables = []
+        for p in parameters:
+            if check_if_prop_subscribable(p):
+                subscribables.append(p)
+
+        prefixed_params = ", ".join([f"{get_prefix(p)}{p}" for p in parameters])
+        unedited_params = ", ".join(parameters)
+
+        if len(subscribables) == 1:
+            # We can convert it to a map expression
+            prop_value_trimmed = f"{get_prefix(subscribables[0])}{subscribables[0]}.map(({subscribables[0]}) => this.{function_name}({unedited_params}))"
+        elif len(subscribables) > 1:
+            # We can convert it to a MappedSubject
+            variable_name = "".join([capitalize_first_letter(v) for v in subscribables])
+            variable_name = variable_name[0].lower() + variable_name[1:]
+
+            insert_new_mapped_subject(
+                variable_name, f"this.{function_name}({prefixed_params})", subscribables
+            )
+
+            prop_value_trimmed = f"this.{variable_name}"
+        else:
+            prop_value_trimmed = f"this.{function_name}({unedited_params})"
 
     # Identify if prop value is a ternary expression
     if "?" in prop_value_trimmed and ":" in prop_value_trimmed:

@@ -6,7 +6,7 @@ interface CabinAltitudeProps {
     x: number;
     y: number;
     cabinAlt: number;
-    cabAltTarget: number;
+    cabinAltTarget: number;
     auto: boolean;
 }
 /* TODO: Pulsing Needle & Number */
